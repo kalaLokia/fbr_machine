@@ -3,9 +3,11 @@ import ftplib
 import io
 import os
 from typing import Optional
+import time
 
 from dotenv import load_dotenv
 
+from web_api import slack_api
 
 load_dotenv()
 
@@ -39,7 +41,10 @@ def get_tienkang_data() -> Optional[bytes | None]:
     """Grasp data from Tienkang machine"""
 
     filename = (
-        os.environ.get("TIENKANG_FILE") + "_" + datetime.date.today().strftime("%y%m%d")
+        os.environ.get("TIENKANG_FILE")
+        + "_"
+        + datetime.date.today().strftime("%y%m%d")
+        + ".csv"
     )
     data = io.BytesIO()
 
@@ -59,6 +64,17 @@ def get_tienkang_data() -> Optional[bytes | None]:
 
 
 if __name__ == "__main__":
-    pass
-
-    # data.decode("utf-16").split("\n")[-2].split("\t")  # gets last data in the bytes
+    start = time.time()
+    data = get_tienkang_data()
+    end = time.time()
+    print(f"Time taken to finish: {end-start}")
+    if data:
+        data = data.decode("utf-16").split("\n")
+        print(f"No. of lines: {len(data)}")
+        last_data = data[-2].split("\t")
+        # gets last data in the bytes
+        tienkang = MachineData(*last_data)
+        print(tienkang.display_status)
+        slack_api(tienkang.display_status)
+    else:
+        print("ERROR Occured")
