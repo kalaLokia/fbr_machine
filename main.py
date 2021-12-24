@@ -48,6 +48,12 @@ def get_tienkang_data() -> Optional[bytes | None]:
     )
     data = io.BytesIO()
 
+    check_min = datetime.datetime.now().minute % 10
+    if check_min < 2 or check_min > 6:
+        # Preventing reading data while hmi uses flash drive to write
+        # 10 minutes gap till next file updation
+        return None
+
     try:
         ftp = ftplib.FTP(os.environ.get("TIENKANG_HOST"))  # port is 21 by default
         ftp.login(
@@ -64,6 +70,7 @@ def get_tienkang_data() -> Optional[bytes | None]:
 
 
 if __name__ == "__main__":
+    # Set the timing to be read data
     start = time.time()
     data = get_tienkang_data()
     end = time.time()
