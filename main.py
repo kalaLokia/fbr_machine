@@ -7,7 +7,7 @@ import time
 
 from dotenv import load_dotenv
 
-from web_api import slack_api
+from web_api import slack_api, webhook_request
 
 load_dotenv()
 
@@ -30,25 +30,21 @@ class MachineData:
 
     @property
     def prod_time(self) -> str:  # Datetime formatted
-        return f"{self.date.strftime('%b %d, %Y')} {self.time.strftime('%I:%M:%S %p')}"
+        return f"{self.date.strftime('%b %d, %Y')} {self.time.strftime('%I:%M %p')}"
 
     @property
     def display_status(self) -> str:
-        return f"{self.prod_time}  :  {self.prod_achieved}"
+        return f"{self.prod_time}  ->  {self.prod_achieved}"
 
 
 def get_tienkang_data() -> Optional[bytes | None]:
     """Grasp data from Tienkang machine"""
 
-    filename = (
-        os.environ.get("TIENKANG_FILE")
-        + "_"
-        + datetime.date.today().strftime("%y%m%d")
-        + ".csv"
-    )
+    now = datetime.datetime.now()
+    filename = os.environ.get("TIENKANG_FILE") + "_" + now.strftime("%y%m%d") + ".csv"
     data = io.BytesIO()
 
-    check_min = datetime.datetime.now().minute % 10
+    check_min = now.minute % 10
     if check_min < 2 or check_min > 6:
         # Preventing reading data while hmi uses flash drive to write
         # 10 minutes gap till next file updation
@@ -60,6 +56,21 @@ def get_tienkang_data() -> Optional[bytes | None]:
             user=os.environ.get("TIENKANG_USER"), passwd=os.environ.get("TIENKANG_PASS")
         )
         ftp.retrbinary("RETR " + filename, data.write)
+
+        # Remove old Data collection files on every even date of week3+ sunday 1pm
+        if now.weekday() == 6 and now.hour == 13:
+            if now.day > 15 and now.day % 2 == 0:
+                ftp.encoding = "unicode_escape"
+                dir_files = []  # to store all files in the root
+                ftp.dir(dir_files.append)
+                for file_info in dir_files:
+                    if "DATA_collection" in file_info:
+                        if filename not in file_info:
+                            old_filename = file_info.split(" ")[-1]
+                            if old_filename[-3:] == "csv":
+                                # data can be exported to db if necessary before removing
+                                ftp.delete(old_filename)
+
     except:
         return None
 
@@ -70,7 +81,7 @@ def get_tienkang_data() -> Optional[bytes | None]:
 
 
 if __name__ == "__main__":
-    # Set the timing to be read data
+
     start = time.time()
     data = get_tienkang_data()
     end = time.time()
@@ -81,7 +92,10 @@ if __name__ == "__main__":
         last_data = data[-2].split("\t")
         # gets last data in the bytes
         tienkang = MachineData(*last_data)
-        print(tienkang.display_status)
-        slack_api(tienkang.display_status)
-    else:
-        print("ERROR Occured")
+        # print(tienkang.display_status)
+        if tienkang.prod_achieved != 0:
+            slack_api(tienkang.display_status)
+            if datetime.datetime.today().weekday() != 6:
+                webhook_request({"text": tienkang.display_status}, "google")
+    # else:
+    #     print("ERROR Occured")

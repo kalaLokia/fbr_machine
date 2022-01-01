@@ -10,11 +10,11 @@ from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
 
-def webhook_request(url: str, data: dict, wh_type: Optional[str] = ""):
+def webhook_request(data: dict, wh_type: Optional[str] = ""):
     """Send the data to webhook."""
 
     try:
-        res = requests.post(url, json=data)
+        res = requests.post(os.environ.get("GOOGLE_WH"), json=data)
         if res.status_code >= 400:
             print(f"{wh_type} request failed: #{res.status_code}")
     except Exception as e:
