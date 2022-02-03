@@ -57,19 +57,20 @@ def get_tienkang_data() -> Optional[bytes | None]:
         )
         ftp.retrbinary("RETR " + filename, data.write)
 
-        # Remove old Data collection files on every even date of week3+ sunday 1pm
+        # Remove old Data collection files on every sunday 1pm
         if now.weekday() == 6 and now.hour == 13:
-            if now.day > 15 and now.day % 2 == 0:
-                ftp.encoding = "unicode_escape"
-                dir_files = []  # to store all files in the root
-                ftp.dir(dir_files.append)
-                for file_info in dir_files:
-                    if "DATA_collection" in file_info:
-                        if filename not in file_info:
-                            old_filename = file_info.split(" ")[-1]
-                            if old_filename[-3:] == "csv":
-                                # data can be exported to db if necessary before removing
-                                ftp.delete(old_filename)
+            # There are non-unicode character files exists in server
+            ftp.encoding = "unicode_escape"
+            dir_files = []  # to store all files in the root
+            ftp.dir(dir_files.append)
+            ftp.encoding = "utf-8"  # To delete, change file encoding back to utf-8
+            for file_info in dir_files:
+                if "DATA_collection" in file_info:
+                    if filename not in file_info:
+                        old_filename = file_info.split(" ")[-1]
+                        if old_filename[-3:] == "csv":
+                            # data can be exported to db if necessary before removing
+                            ftp.delete(old_filename)
 
     except:
         return None
