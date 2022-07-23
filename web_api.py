@@ -4,17 +4,18 @@ Webhook/Api implementation
 """
 
 from typing import Optional
-import os
 import requests
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
+
+import config
 
 
 def webhook_request(data: dict, wh_type: Optional[str] = ""):
     """Send the data to webhook."""
 
     try:
-        res = requests.post(os.environ.get("GOOGLE_WH"), json=data)
+        res = requests.post(config.GOOGLE_WH, json=data)
         if res.status_code >= 400:
             print(f"{wh_type} request failed: #{res.status_code}")
     except Exception as e:
@@ -24,9 +25,9 @@ def webhook_request(data: dict, wh_type: Optional[str] = ""):
 def slack_api(text: str, blocks: list = None) -> None:
     """Slack client execution"""
     try:
-        CLIENT = WebClient(token=os.environ.get("SLACK_TOKEN"))
+        CLIENT = WebClient(token=config.SLACK_TOKEN)
         res = CLIENT.chat_postMessage(
-            channel=os.environ.get("SLACK_CHANNEL"), text=text
+            channel=config.SLACK_CHANNEL, text=text
         )
         print(res.status_code)
     except SlackApiError as e:

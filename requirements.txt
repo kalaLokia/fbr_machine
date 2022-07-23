@@ -1,4 +1,3 @@
-python-dotenv
-black
 requests
 slack_sdk
+pyinstaller

@@ -1,15 +1,12 @@
+from typing import Optional
 import datetime
 import ftplib
 import io
-import os
-from typing import Optional
+import logging
 import time
 
-from dotenv import load_dotenv
-
+import config
 from web_api import slack_api, webhook_request
-
-load_dotenv()
 
 
 class MachineData:
@@ -39,26 +36,27 @@ class MachineData:
 
 def get_tienkang_data() -> Optional[bytes | None]:
     """Grasp data from Tienkang machine"""
-
+    ftp = None
     now = datetime.datetime.now()
-    filename = os.environ.get("TIENKANG_FILE") + "_" + now.strftime("%y%m%d") + ".csv"
+    filename = config.TIENKANG_FILE + "_" + now.strftime("%y%m%d") + ".csv"
     data = io.BytesIO()
 
     check_min = now.minute % 10
     if check_min < 2 or check_min > 6:
         # Preventing reading data while hmi uses flash drive to write
         # 10 minutes gap till next file updation
+        logging.info("Expected time range of HMI writing to file, so skipping.")
         return None
 
     try:
-        ftp = ftplib.FTP(os.environ.get("TIENKANG_HOST"))  # port is 21 by default
+        ftp = ftplib.FTP(config.TIENKANG_HOST)  # port is 21 by default
         ftp.login(
-            user=os.environ.get("TIENKANG_USER"), passwd=os.environ.get("TIENKANG_PASS")
+            user=config.TIENKANG_USER, passwd=config.TIENKANG_PASS
         )
         ftp.retrbinary("RETR " + filename, data.write)
 
         # Remove old Data collection files on every sunday 1pm
-        if now.weekday() == 6 and now.hour == 13:
+        if now.weekday() == 0 and now.hour == 12:
             # There are non-unicode character files exists in server
             ftp.encoding = "unicode_escape"
             dir_files = []  # to store all files in the root
@@ -73,10 +71,12 @@ def get_tienkang_data() -> Optional[bytes | None]:
                             ftp.delete(old_filename)
 
     except:
+        logging.exception("Failed FTP operation..!!")
         return None
 
     finally:
-        ftp.quit()
+        if ftp:
+            ftp.quit()
 
     return data.getvalue()
 
@@ -98,5 +98,5 @@ if __name__ == "__main__":
             slack_api(tienkang.display_status)
             if datetime.datetime.today().weekday() != 6:
                 webhook_request({"text": tienkang.display_status}, "google")
-    # else:
-    #     print("ERROR Occured")
+    else:
+        logging.info("Execution failed!")
